@@ -223,7 +223,7 @@ print(f"Parameters: {num_params:,}")
 tokens_per_fwdbwd = DEVICE_BATCH_SIZE * MAX_SEQ_LEN
 assert TOTAL_BATCH_SIZE % tokens_per_fwdbwd == 0, (
     f"TOTAL_BATCH_SIZE ({TOTAL_BATCH_SIZE}) must be divisible by "
-    f"DEVICE_BATCH_SIZE*MAX_SEQ_LEN ({tokens_per_fwdbwd})"
+    f"DEVICE_BATCH_SIZE*MAX_SEQ_LEN ({DEVICE_BATCH_SIZE}*{MAX_SEQ_LEN}={tokens_per_fwdbwd})"
 )
 grad_accum_steps = TOTAL_BATCH_SIZE // tokens_per_fwdbwd
 

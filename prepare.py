@@ -46,7 +46,7 @@ VAL_FILES = ["val-00000-of-00001.parquet"]
 ALL_FILES = TRAIN_FILES + VAL_FILES
 
 VOCAB_SIZE = 256  # byte-level tokenizer: tokens are raw UTF-8 bytes (0–255)
-BOS_TOKEN_ID = 0  # repurpose byte 0x00 as BOS (rare in natural text)
+BOS_TOKEN_ID = 0  # repurpose byte 0x00 as BOS (0x00 never appears in valid UTF-8 text)
 
 # Device selection: prefer MPS then CUDA, fall back to CPU
 if torch.backends.mps.is_available():
@@ -260,6 +260,7 @@ def evaluate_bpb(model, tokenizer, batch_size):
     """
     token_bytes = get_token_bytes(device=DEVICE)
     val_loader = make_dataloader(tokenizer, batch_size, MAX_SEQ_LEN, "val")
+    # max(1,...) ensures at least one eval step even if batch_size*MAX_SEQ_LEN > EVAL_TOKENS
     steps = max(1, EVAL_TOKENS // (batch_size * MAX_SEQ_LEN))
     total_nats = 0.0
     total_bytes = 0
