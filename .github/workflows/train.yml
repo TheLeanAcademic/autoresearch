@@ -1,0 +1,46 @@
+name: autoresearch training
+
+on:
+  push:
+    branches:
+      - 'autoresearch/**'
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache TinyStories data
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/autoresearch
+          key: autoresearch-tinystories-v1
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Download data
+        run: uv run prepare.py
+
+      - name: Run training
+        run: uv run train.py > run.log 2>&1
+
+      - name: Show results
+        if: always()
+        run: grep "^val_bpb:\|^peak_vram_mb:\|^num_params_M:" run.log || tail -n 50 run.log
+
+      - name: Upload run log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-log-${{ github.sha }}
+          path: run.log
