@@ -9,7 +9,8 @@ jobs:
   train:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -44,3 +45,44 @@ jobs:
         with:
           name: run-log-${{ github.sha }}
           path: run.log
+
+      - name: Compare val_bpb and auto-merge if improved
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_VAL_BPB=$(grep "^val_bpb:" run.log | tail -1 | awk '{print $2}')
+          if [ -z "$NEW_VAL_BPB" ]; then
+            echo "ERROR: val_bpb not found in run.log — skipping merge."
+            exit 1
+          fi
+          echo "New val_bpb: $NEW_VAL_BPB"
+
+          git fetch origin master
+          BASELINE=$(git show origin/master:best_val_bpb.txt 2>/dev/null | tr -d '[:space:]')
+          if [ -z "$BASELINE" ]; then
+            BASELINE="9999.0"
+          fi
+          echo "Baseline val_bpb (master): $BASELINE"
+
+          IMPROVED=$(python3 -c "
+          new = float('$NEW_VAL_BPB')
+          baseline = float('$BASELINE')
+          print('yes' if new < baseline else 'no')
+          ")
+
+          if [ "$IMPROVED" = "yes" ]; then
+            echo "val_bpb improved ($NEW_VAL_BPB < $BASELINE) — merging into master."
+
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git checkout -b _update_best_val_bpb_${{ github.run_id }} origin/master
+            echo "$NEW_VAL_BPB" > best_val_bpb.txt
+            git add best_val_bpb.txt
+            git commit -m "ci: update best_val_bpb to $NEW_VAL_BPB [skip ci]"
+            git push origin HEAD:master
+
+            gh pr merge "${{ github.ref_name }}" --merge --auto --delete-branch || \
+              gh pr merge "${{ github.ref_name }}" --merge --delete-branch
+          else
+            echo "val_bpb did not improve ($NEW_VAL_BPB >= $BASELINE) — skipping merge."
+          fi
